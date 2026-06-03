@@ -11,20 +11,22 @@
 int getmac(char *mac_addr, size_t size_buf, char *dev){
     int sock;
     struct ifreq mac;
-    if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != EOF){
-        snprintf(mac.ifr_name, IFNAMSIZ - 1, "%s", dev);
-        if(ioctl(sock, SIOCGIFHWADDR, &mac) != EOF){
-            snprintf(mac_addr, size_buf, "%.2X:%.2X:%.2X:%.2X:%.2X:%.2X", (u_char)mac.ifr_hwaddr.sa_data[0],
-                                                                        (u_char)mac.ifr_hwaddr.sa_data[1],
-                                                                        (u_char)mac.ifr_hwaddr.sa_data[2],
-                                                                        (u_char)mac.ifr_hwaddr.sa_data[3],
-                                                                        (u_char)mac.ifr_hwaddr.sa_data[4],
-                                                                        (u_char)mac.ifr_hwaddr.sa_data[5]);
-            close(sock);
-            return EXIT_SUCCESS;
+    if(dev != NULL && mac_addr != NULL && size_buf > 0){
+        if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != -1){
+            snprintf(mac.ifr_name, IFNAMSIZ, "%s", dev);
+            if(ioctl(sock, SIOCGIFHWADDR, &mac) != -1){
+                snprintf(mac_addr, size_buf, "%.2X:%.2X:%.2X:%.2X:%.2X:%.2X", (u_char)mac.ifr_hwaddr.sa_data[0] & 0xFF,
+                                                                            (u_char)mac.ifr_hwaddr.sa_data[1] & 0xFF,
+                                                                            (u_char)mac.ifr_hwaddr.sa_data[2] & 0xFF,
+                                                                            (u_char)mac.ifr_hwaddr.sa_data[3] & 0xFF,
+                                                                            (u_char)mac.ifr_hwaddr.sa_data[4] & 0xFF,
+                                                                            (u_char)mac.ifr_hwaddr.sa_data[5] & 0xFF);
+                close(sock);
+                return EXIT_SUCCESS;
+            }
+            else
+                close(sock);
         }
-        else
-            close(sock);
-    }
-    return EOF;
+    }    
+    return -1;
 }
