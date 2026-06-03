@@ -45,7 +45,7 @@ int main(int argc, char **argv){
      if(optind < argc)
         dev = argv[optind];
     if (dev == NULL && mode != '\0') {
-        fprintf(stderr, "Error: Network device interface not specified.\n");
+        fprintf(stderr, "Network device interface not specified.\n");
         help();
         return EXIT_FAILURE;
     }
