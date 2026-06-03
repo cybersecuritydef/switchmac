@@ -20,40 +20,66 @@ void help(void){
 int main(int argc, char **argv){
     int opt = 0;
     opterr = false;
+    char mode = '\0';
+    char *mac = NULL;
+    char *dev = NULL;
     char mac_addr[MAC_SIZE];
-    while((opt = getopt(argc, argv, "r:g:s:h")) != EOF){
+     while((opt = getopt(argc, argv, "rgs:h")) != -1){
         switch(opt){
             case 'r' :
-                if(getmac(mac_addr, MAC_SIZE, argv[2]) != EOF && setmac_rand(argv[2]) != EOF){
-                    printf("Current mac address %s: %s\n", argv[2], mac_addr);
-                    getmac(mac_addr, MAC_SIZE, argv[2]);
-                    printf("New mac address %s: %s\n", argv[2], mac_addr);
-                }
-                else
-                    perror("Set mac");
-                return 0;
-            case 's' :
-                if(getmac(mac_addr, MAC_SIZE, argv[3]) != EOF && setmac(argv[2], argv[3]) != EOF){
-                    printf("Current mac address %s: %s\n", argv[3], mac_addr);
-                    printf("New mac address %s: %s\n", argv[3], argv[2]);
-                }
-                else
-                    perror("Set mac");
-                return 0;
             case 'g' :
-                if(getmac(mac_addr, MAC_SIZE, argv[2]) != EOF)
-                    printf("Current mac address %s: %s\n", argv[2], mac_addr);
-                else
-                    perror("Get mac");
-                return 0;
+                mode = opt;
+                break;
+            case 's' :
+                mode = 's';
+                mac = optarg;
+                break;
             case 'h':
                 help();
-                return 0;
+                return EXIT_SUCCESS;
             default :
                 fprintf(stderr, "Invalid argument\n");
-                return EOF;
+                return EXIT_FAILURE;
         }
     }
-    help();
+     if(optind < argc)
+        dev = argv[optind];
+    if (dev == NULL && mode != '\0') {
+        fprintf(stderr, "Error: Network device interface not specified.\n");
+        help();
+        return EXIT_FAILURE;
+    }
+    switch(mode){
+        case 'r':
+            if(getmac(mac_addr, MAC_SIZE, dev) != -1 && setmac_rand(dev) != -1){
+                printf("Current mac address %s: %s\n", dev, mac_addr);
+                getmac(mac_addr, MAC_SIZE, dev);
+                printf("New mac address     %s: %s\n", dev, mac_addr);
+                return EXIT_SUCCESS;
+            }
+            else
+                perror("Set random mac failed");
+            return EXIT_FAILURE;
+        case 's':
+            if(getmac(mac_addr, MAC_SIZE, dev) != -1 && setmac(mac, dev) != -1){
+                printf("Current mac address %s: %s\n", dev, mac_addr);
+                printf("New mac address     %s: %s\n", dev, mac);
+                return EXIT_SUCCESS;
+            }
+            else
+                perror("Set static mac failed");
+            return EXIT_FAILURE;
+        case 'g':
+            if(getmac(mac_addr, MAC_SIZE, dev) != -1) {
+                printf("Current mac address %s: %s\n", dev, mac_addr);
+                return EXIT_SUCCESS;
+            }
+            else
+                perror("Get mac failed");
+            return EXIT_FAILURE;
+        default:
+            help();
+            break;
+    }
     return 0;
 }
