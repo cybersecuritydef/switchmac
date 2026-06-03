@@ -18,30 +18,23 @@ static uint randoms(void){
     return (1 + rand() % 255);
 }
 
-static bool is_mac(char *mac){
-    int count = 0;
-    while(*mac != '\0'){
-        if(*mac == ':')
-            count++;
-        mac++;
-    }
-    if(count >= 5)
-        return true;
-    return false;
-}
-
-static int device_shutdown(int sock, char *dev){    
+static int device_toggle(int sock, char *dev){    
     struct ifreq device;
-    snprintf(device.ifr_name, IFNAMSIZ - 1, "%s", dev);
-    if(ioctl(sock, SIOCGIFFLAGS, &device) != EOF){
-        if(device.ifr_flags & IFF_UP)
-            device.ifr_flags &= ~IFF_UP;
-        else
-            device.ifr_flags |= IFF_UP;
-        if(ioctl(sock, SIOCSIFFLAGS, &device) != EOF)            
-            return EXIT_SUCCESS;
-    }            
-    return EOF;
+    if(dev != NULL && sock >= 0){
+        memset(&device, '\0', sizeof(struct ifreq));
+        snprintf(device.ifr_name, IFNAMSIZ, "%s", dev);
+        if(ioctl(sock, SIOCGIFFLAGS, &device) != -1){
+            if(device.ifr_flags & IFF_UP)
+                device.ifr_flags &= ~IFF_UP;
+            else{
+                device.ifr_flags |= IFF_UP;
+                device.ifr_flags |= IFF_RUNNING; 
+            }                
+            if(ioctl(sock, SIOCSIFFLAGS, &device) != -1)            
+                return EXIT_SUCCESS;
+        }  
+    }               
+    return -1;
 }
 
 int setmac(char *mac, char *dev){
@@ -62,9 +55,9 @@ int setmac(char *mac, char *dev){
                                                      &devmac.ifr_hwaddr.sa_data[4],
                                                      &devmac.ifr_hwaddr.sa_data[5]);
 
-        device_shutdown(sock, dev);
+        device_toggle(sock, dev);
         if(ioctl(sock, SIOCSIFHWADDR, &devmac) != EOF){
-            device_shutdown(sock, dev);
+            device_toggle(sock, dev);
             close(sock);
             return EXIT_SUCCESS;
         }
@@ -87,9 +80,9 @@ int setmac_rand(char *dev){
             else
                 dev_mac.ifr_hwaddr.sa_data[index] = randoms();
         }
-        device_shutdown(sock, dev);
+        device_toggle(sock, dev);
         if(ioctl(sock, SIOCSIFHWADDR, &dev_mac) != EOF){
-            device_shutdown(sock, dev);
+            device_toggle(sock, dev);
             close(sock);
             return EXIT_SUCCESS;
         }
