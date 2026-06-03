@@ -18,6 +18,19 @@ static uint randoms(void){
     return (1 + rand() % 255);
 }
 
+static bool is_device_up(int sock, char *dev){
+    struct ifreq device;
+    if(dev != NULL && sock >= 0){
+        memset(&device, '\0', sizeof(struct ifreq));
+        snprintf(device.ifr_name, IFNAMSIZ, "%s", dev);
+        if(ioctl(sock, SIOCGIFFLAGS, &device) != -1){
+            if(device.ifr_flags & IFF_UP)
+                return true;             
+        }  
+    }
+    return false;
+}
+
 static int device_toggle(int sock, char *dev){    
     struct ifreq device;
     if(dev != NULL && sock >= 0){
@@ -39,54 +52,70 @@ static int device_toggle(int sock, char *dev){
 
 int setmac(char *mac, char *dev){
     int sock = 0;
+    int i = 0;
+    bool state_up = false;
     struct ifreq devmac;
-    if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != EOF){
-        snprintf(devmac.ifr_name, IFNAMSIZ - 1, "%s", dev);
-        devmac.ifr_hwaddr.sa_family = ARPHRD_ETHER;
-        if(is_mac(mac) == false){
-            errno = EINVAL;
+    unsigned int tmp_mac[6];
+    if(mac != NULL && dev != NULL){
+        if(sscanf(mac, "%x:%x:%x:%x:%x:%x", &tmp_mac[0], &tmp_mac[1], &tmp_mac[2], &tmp_mac[3], &tmp_mac[4], &tmp_mac[5]) != 6)
+            return -1;  
+        if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != -1){
+            memset(&devmac, '\0', sizeof(struct ifreq));
+            snprintf(devmac.ifr_name, IFNAMSIZ, "%s", dev);
+            devmac.ifr_hwaddr.sa_family = ARPHRD_ETHER;        
+            for(i = 0; i < 6; i++) 
+                devmac.ifr_hwaddr.sa_data[i] = (char)(tmp_mac[i] & 0xFF);
+            state_up = is_device_up(sock, dev);
+            if(state_up)
+                device_toggle(sock, dev);
+            if(ioctl(sock, SIOCSIFHWADDR, &devmac) != -1){
+                if(state_up)
+                    device_toggle(sock, dev);
+                close(sock);
+                return EXIT_SUCCESS;
+            }
+            else{
+                if(state_up)
+                    device_toggle(sock, dev);
+            }                
             close(sock);
-            return EOF;
         }
-        sscanf(mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &devmac.ifr_hwaddr.sa_data[0],
-                                                     &devmac.ifr_hwaddr.sa_data[1],
-                                                     &devmac.ifr_hwaddr.sa_data[2],
-                                                     &devmac.ifr_hwaddr.sa_data[3],
-                                                     &devmac.ifr_hwaddr.sa_data[4],
-                                                     &devmac.ifr_hwaddr.sa_data[5]);
-
-        device_toggle(sock, dev);
-        if(ioctl(sock, SIOCSIFHWADDR, &devmac) != EOF){
-            device_toggle(sock, dev);
-            close(sock);
-            return EXIT_SUCCESS;
-        }
-        close(sock);
     }
-    return EOF;
+    return -1;
 }
 
 int setmac_rand(char *dev){
     int sock = 0;
     int index = 0;
-    struct ifreq dev_mac;
+    bool state_up = false;
+    struct ifreq devmac;
     srand(time(NULL));
-    if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != EOF){
-        snprintf(dev_mac.ifr_name, IFNAMSIZ - 1, "%s", dev);
-        dev_mac.ifr_hwaddr.sa_family = ARPHRD_ETHER;
-        for(index = 0; index < 6; ++index){
-            if(index == 0)
-                dev_mac.ifr_hwaddr.sa_data[0] = (randoms() & 254);
-            else
-                dev_mac.ifr_hwaddr.sa_data[index] = randoms();
-        }
-        device_toggle(sock, dev);
-        if(ioctl(sock, SIOCSIFHWADDR, &dev_mac) != EOF){
-            device_toggle(sock, dev);
+    if(dev != NULL){
+        if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) != -1){
+            memset(&devmac, '\0', sizeof(struct ifreq));
+            snprintf(devmac.ifr_name, IFNAMSIZ, "%s", dev);
+            devmac.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+            for(index = 0; index < 6; ++index){
+                if(index == 0)
+                    devmac.ifr_hwaddr.sa_data[0] = (randoms() & 0xFC) | 0x02;
+                else
+                    devmac.ifr_hwaddr.sa_data[index] = randoms();
+            }
+            state_up = is_device_up(sock, dev);
+            if(state_up)
+                device_toggle(sock, dev);
+            if(ioctl(sock, SIOCSIFHWADDR, &devmac) != -1){
+                if(state_up)
+                    device_toggle(sock, dev);
+                close(sock);
+                return EXIT_SUCCESS;
+            }
+            else{
+                if(state_up)
+                    device_toggle(sock, dev);
+            }                
             close(sock);
-            return EXIT_SUCCESS;
-        }
-        close(sock);
-    }
-    return EOF;
+        }   
+    }    
+    return -1;
 }
